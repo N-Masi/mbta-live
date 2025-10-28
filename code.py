@@ -18,8 +18,8 @@ import adafruit_display_text.label
 G = displayio.Group() # TODO: a global, not a constant
 TIME_URL = "http://worldtimeapi.org/api/ip"
 FONT = bitmap_font.load_font("fonts/4x6_kujala.pcf")
-CENTRAL_83_URL = f"https://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2437"
-PORTER_83_URL = f"https://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2453"
+CENTRAL_83_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2437"
+PORTER_83_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2453"
 print(CENTRAL_83_URL)
 
 # setup LED board
@@ -64,7 +64,7 @@ esp32_cs = DigitalInOut(board.ESP_CS)
 esp32_ready = DigitalInOut(board.ESP_BUSY)
 esp32_reset = DigitalInOut(board.ESP_RESET)
 spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
-esp32 = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset)
+esp32 = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset, debug=True)
 while not esp32.is_connected:
     try:
         esp32.connect_AP(ssid, password)
@@ -147,27 +147,32 @@ r.close()
 
 time.sleep(5)
 
-while True:
-    now = datetime.fromtimestamp(time.time())
-    r = requests.get(CENTRAL_83_URL)
-    central_83 = response.json()
-    r.close()
-    r = requests.get(PORTER_83_URL)
-    porter_83 = response.json()
-    r.close()
+r = requests.get(CENTRAL_83_URL)
+central_83 = response.json()
+print(central_83)
+r.close()
 
-    next_central_timestamp = central_83['data'][0]['attributes']['arrival_time']
-    next_central_time = datetime.fromisoformat(next_central_timestamp)
-    central_wait = (next_central_time - now).seconds // 60
-    central_83_msg.text = f'83 Central: {central_wait}m'
+# while True:
+#     now = datetime.fromtimestamp(time.time())
+#     r = requests.get(CENTRAL_83_URL)
+#     central_83 = response.json()
+#     r.close()
+#     r = requests.get(PORTER_83_URL)
+#     porter_83 = response.json()
+#     r.close()
 
-    next_porter_timestamp = porter_83['data'][0]['attributes']['arrival_time']
-    next_porter_time = datetime.fromisoformat(next_porter_timestamp)
-    porter_wait = (next_porter_time - now).seconds // 60
-    porter_83_msg.text = f'83 Porter: {porter_wait}m'
+#     next_central_timestamp = central_83['data'][0]['attributes']['arrival_time']
+#     next_central_time = datetime.fromisoformat(next_central_timestamp)
+#     central_wait = (next_central_time - now).seconds // 60
+#     central_83_msg.text = f'83 Central: {central_wait}m'
 
-    display.refresh()
-    time.sleep(1)
+#     next_porter_timestamp = porter_83['data'][0]['attributes']['arrival_time']
+#     next_porter_time = datetime.fromisoformat(next_porter_timestamp)
+#     porter_wait = (next_porter_time - now).seconds // 60
+#     porter_83_msg.text = f'83 Porter: {porter_wait}m'
+
+#     display.refresh()
+#     time.sleep(1)
 
 
 
