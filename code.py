@@ -1,7 +1,7 @@
 from os import getenv
 import rtc
 import time
-from adafruit_datetime import datetime
+from adafruit_datetime import datetime, timezone, timedelta
 import board
 import busio
 from digitalio import DigitalInOut
@@ -16,11 +16,13 @@ import adafruit_display_text.label
 
 # constants
 G = displayio.Group() # TODO: a global, not a constant
-TIME_URL = "http://worldtimeapi.org/api/ip"
+TIME_URL = "https://worldtimeapi.org/api/ip"
 FONT = bitmap_font.load_font("fonts/4x6_kujala.pcf")
 CENTRAL_83_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2437"
 PORTER_83_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2453"
 print(CENTRAL_83_URL)
+HEADERS = {"user-agent": "mbta-tracker"}
+WIFI_DEBUG = True
 
 # setup LED board
 displayio.release_displays()
@@ -64,7 +66,7 @@ esp32_cs = DigitalInOut(board.ESP_CS)
 esp32_ready = DigitalInOut(board.ESP_BUSY)
 esp32_reset = DigitalInOut(board.ESP_RESET)
 spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
-esp32 = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset, debug=True)
+esp32 = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset, debug=WIFI_DEBUG)
 while not esp32.is_connected:
     try:
         esp32.connect_AP(ssid, password)
@@ -80,6 +82,11 @@ wifi_msg = adafruit_display_text.label.Label(
 G.append(wifi_msg)
 display.refresh()
 print(wifi_msg.text)
+
+if esp32.status == adafruit_esp32spi.WL_IDLE_STATUS:
+    print("ESP32 found and in idle mode")
+print("Firmware vers.", esp32.firmware_version)
+print("MAC addr:", ":".join("%02X" % byte for byte in esp32.MAC_address))
 
 # establish http connection
 pool = adafruit_connection_manager.get_radio_socketpool(esp32)
@@ -99,7 +106,7 @@ print(http_msg.text)
 the_rtc = rtc.RTC()
 
 # get realtime
-response = requests.get(TIME_URL)
+response = requests.get(TIME_URL, headers=HEADERS)
 print(response.headers)
 json = response.json()
 response.close()
@@ -123,59 +130,53 @@ G.append(time_msg)
 display.refresh()
 print(time_msg.text)
 
+time.sleep(5)
+G.remove(led_msg)
+G.remove(wifi_msg)
+G.remove(http_msg)
+G.remove(time_msg)
+
 # reset screen
-G = displayio.Group()
 central_83_msg = adafruit_display_text.label.Label(
     FONT,
     color=0xFFC72C,
-    text=f'83 Central: {0}m',
+    text=f'83 Central: ---',
     x=1,
     y=8)
 porter_83_msg = adafruit_display_text.label.Label(
     FONT,
     color=0xFFC72C,
-    text=f'83 Porter: {0}m',
+    text=f'83 Porter: ---',
     x=1,
     y=16)
 G.append(central_83_msg)
 G.append(porter_83_msg)
+display.refresh()
 
-JSON_URL = "http://wifitest.adafruit.com/testwifi/sample.json"
-r = requests.get(JSON_URL)
-print(r.json())
-r.close()
+while True:
+    now = datetime.now()
+    response = requests.get(CENTRAL_83_URL)
+    central_83 = response.json()
+    response.close()
+    response = requests.get(PORTER_83_URL)
+    porter_83 = response.json()
+    response.close()
 
-time.sleep(5)
+    if len(central_83['data']) > 0:
+        next_central_timestamp = central_83['data'][0]['attributes']['arrival_time']
+        next_central_time = datetime.fromisoformat(next_central_timestamp).replace(tzinfo = None) # this hack only works because the local time is in the same timezone as the train stations
+        central_wait = (next_central_time - now).seconds // 60
+        central_83_msg.text = f'83 Central: {central_wait}m'
+    else:
+        central_83_msg.text = f'83 Central: tmrw'
 
-r = requests.get(CENTRAL_83_URL)
-central_83 = response.json()
-print(central_83)
-r.close()
+    if len(porter_83['data']) > 0:
+        next_porter_timestamp = porter_83['data'][0]['attributes']['arrival_time']
+        next_porter_time = datetime.fromisoformat(next_porter_timestamp).replace(tzinfo = None)
+        porter_wait = (next_porter_time - now).seconds // 60
+        porter_83_msg.text = f'83 Porter: {porter_wait}m'
+    else:
+        porter_83_msg.text = f'83 Porter: tmrw'
 
-# while True:
-#     now = datetime.fromtimestamp(time.time())
-#     r = requests.get(CENTRAL_83_URL)
-#     central_83 = response.json()
-#     r.close()
-#     r = requests.get(PORTER_83_URL)
-#     porter_83 = response.json()
-#     r.close()
-
-#     next_central_timestamp = central_83['data'][0]['attributes']['arrival_time']
-#     next_central_time = datetime.fromisoformat(next_central_timestamp)
-#     central_wait = (next_central_time - now).seconds // 60
-#     central_83_msg.text = f'83 Central: {central_wait}m'
-
-#     next_porter_timestamp = porter_83['data'][0]['attributes']['arrival_time']
-#     next_porter_time = datetime.fromisoformat(next_porter_timestamp)
-#     porter_wait = (next_porter_time - now).seconds // 60
-#     porter_83_msg.text = f'83 Porter: {porter_wait}m'
-
-#     display.refresh()
-#     time.sleep(1)
-
-
-
-
-
-
+    display.refresh()
+    time.sleep(10)
