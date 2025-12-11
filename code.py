@@ -20,9 +20,34 @@ TIME_URL = "https://worldtimeapi.org/api/ip"
 FONT = bitmap_font.load_font("fonts/4x6_kujala.pcf")
 CENTRAL_83_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2437"
 PORTER_83_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2453"
-print(CENTRAL_83_URL)
+HARVARD_109_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=109&filter[stop]=2546"
+HARVARD_69_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=69&filter[stop]=1427"
+LECHMERE_69_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=69&filter[stop]=1403"
 HEADERS = {"user-agent": "mbta-tracker"}
-WIFI_DEBUG = True
+WIFI_DEBUG = False
+COLOR_DARK_WHITE = 0x777777
+COLOR_BUS_83 = 0x7a5800
+COLOR_BUS_109 = 0x7a0022
+COLOR_BUS_69 = 0x144700
+
+# helper functions
+def calibrate_realtime_clock() -> bool:
+    the_rtc = rtc.RTC()
+    response = requests.get(TIME_URL, headers=HEADERS)
+    print(response.headers)
+    json = response.json()
+    response.close()
+    current_time = json["datetime"]
+    the_date, the_time = current_time.split("T")
+    year, month, mday = (int(x) for x in the_date.split("-"))
+    the_time = the_time.split(".")[0]
+    hours, minutes, seconds = (int(x) for x in the_time.split(":"))
+    year_day = json["day_of_year"]
+    week_day = json["day_of_week"]
+    is_dst = json["dst"]
+    now = time.struct_time((year, month, mday, hours, minutes, seconds, week_day, year_day, is_dst))
+    the_rtc.datetime = now
+    return True
 
 # setup LED board
 displayio.release_displays()
@@ -51,7 +76,7 @@ display = framebufferio.FramebufferDisplay(matrix)
 display.root_group = G
 led_msg = adafruit_display_text.label.Label(
     FONT,
-    color=0x777777,
+    color=COLOR_DARK_WHITE,
     text='LED: on',
     x=1,
     y=8)
@@ -75,7 +100,7 @@ while not esp32.is_connected:
         continue
 wifi_msg = adafruit_display_text.label.Label(
     FONT,
-    color=0x777777,
+    color=COLOR_DARK_WHITE,
     text='Lighthouse: on',
     x=1,
     y=16)
@@ -94,7 +119,7 @@ ssl_context = adafruit_connection_manager.get_radio_ssl_context(esp32)
 requests = adafruit_requests.Session(pool, ssl_context)
 http_msg = adafruit_display_text.label.Label(
     FONT,
-    color=0x777777,
+    color=COLOR_DARK_WHITE,
     text='HTTP: on',
     x=1,
     y=24)
@@ -103,32 +128,19 @@ display.refresh()
 print(http_msg.text)
 
 # calibrate onboard clock
-the_rtc = rtc.RTC()
-
-# get realtime
-response = requests.get(TIME_URL, headers=HEADERS)
-print(response.headers)
-json = response.json()
-response.close()
-current_time = json["datetime"]
-the_date, the_time = current_time.split("T")
-year, month, mday = (int(x) for x in the_date.split("-"))
-the_time = the_time.split(".")[0]
-hours, minutes, seconds = (int(x) for x in the_time.split(":"))
-year_day = json["day_of_year"]
-week_day = json["day_of_week"]
-is_dst = json["dst"]
-now = time.struct_time((year, month, mday, hours, minutes, seconds, week_day, year_day, is_dst))
-the_rtc.datetime = now
-time_msg = adafruit_display_text.label.Label(
-    FONT,
-    color=0x777777,
-    text='Realtime: on',
-    x=1,
-    y=32)
-G.append(time_msg)
-display.refresh()
-print(time_msg.text)
+clock_calibrated = calibrate_realtime_clock()
+if clock_calibrated:
+    time_msg = adafruit_display_text.label.Label(
+        FONT,
+        color=COLOR_DARK_WHITE,
+        text='Realtime: on',
+        x=1,
+        y=32)
+    G.append(time_msg)
+    display.refresh()
+    print(time_msg.text)
+else:
+    print('failed to calibrate clock')
 
 time.sleep(5)
 G.remove(led_msg)
@@ -139,27 +151,64 @@ G.remove(time_msg)
 # reset screen
 central_83_msg = adafruit_display_text.label.Label(
     FONT,
-    color=0xFFC72C,
+    color=COLOR_BUS_83,
     text=f'83 Central: ---',
     x=1,
-    y=8)
+    y=18)
 porter_83_msg = adafruit_display_text.label.Label(
     FONT,
-    color=0xFFC72C,
+    color=COLOR_BUS_83,
     text=f'83 Porter: ---',
     x=1,
-    y=16)
+    y=26)
+harvard_109_msg = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_BUS_109,
+    text=f'109 Harvard: ---',
+    x=1,
+    y=34)
+harvard_69_msg = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_BUS_69,
+    text=f'69 Harvard: ---',
+    x=1,
+    y=42)
+lechmere_69_msg = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_BUS_69,
+    text=f'69 Lechmere: ---',
+    x=1,
+    y=50)
 G.append(central_83_msg)
 G.append(porter_83_msg)
+G.append(harvard_109_msg)
+G.append(harvard_69_msg)
+G.append(lechmere_69_msg)
 display.refresh()
 
+cycles_since_calibration = 0
 while True:
+    cycles_since_calibration += 1
     now = datetime.now()
+
     response = requests.get(CENTRAL_83_URL)
     central_83 = response.json()
     response.close()
+
     response = requests.get(PORTER_83_URL)
     porter_83 = response.json()
+    response.close()
+
+    response = requests.get(HARVARD_109_URL)
+    harvard_109 = response.json()
+    response.close()
+
+    response = requests.get(HARVARD_69_URL)
+    harvard_69 = response.json()
+    response.close()
+
+    response = requests.get(LECHMERE_69_URL)
+    lechmere_69 = response.json()
     response.close()
 
     if len(central_83['data']) > 0:
@@ -167,6 +216,7 @@ while True:
         next_central_time = datetime.fromisoformat(next_central_timestamp).replace(tzinfo = None) # this hack only works because the local time is in the same timezone as the train stations
         central_wait = (next_central_time - now).seconds // 60
         central_83_msg.text = f'83 Central: {central_wait}m'
+        print(f'central wait {central_wait}')
     else:
         central_83_msg.text = f'83 Central: tmrw'
 
@@ -174,9 +224,48 @@ while True:
         next_porter_timestamp = porter_83['data'][0]['attributes']['arrival_time']
         next_porter_time = datetime.fromisoformat(next_porter_timestamp).replace(tzinfo = None)
         porter_wait = (next_porter_time - now).seconds // 60
+        print(f'porter_wait {porter_wait}')
         porter_83_msg.text = f'83 Porter: {porter_wait}m'
     else:
         porter_83_msg.text = f'83 Porter: tmrw'
 
+    if len(harvard_109['data']) > 0:
+        next_harvard_timestamp = harvard_109['data'][0]['attributes']['arrival_time']
+        next_harvard_time = datetime.fromisoformat(next_harvard_timestamp).replace(tzinfo = None)
+        harvard_wait = (next_harvard_time - now).seconds // 60
+        print(f'harvard_wait {harvard_wait}')
+        harvard_109_msg.text = f'109 Harvard: {harvard_wait}m'
+    else:
+        harvard_109_msg.text = f'109 Harvard: tmrw'
+
+    if len(harvard_69['data']) > 0:
+        next_harvard_timestamp = harvard_69['data'][0]['attributes']['arrival_time']
+        next_harvard_time = datetime.fromisoformat(next_harvard_timestamp).replace(tzinfo = None)
+        harvard_wait = (next_harvard_time - now).seconds // 60
+        print(f'harvard_wait_69 {harvard_wait}')
+        harvard_69_msg.text = f'69 Harvard: {harvard_wait}m'
+    else:
+        harvard_69_msg.text = f'69 Harvard: tmrw'
+
+    if len(lechmere_69['data']) > 0:
+        next_lechmere_timestamp = lechmere_69['data'][0]['attributes']['arrival_time']
+        next_lechmere_time = datetime.fromisoformat(next_lechmere_timestamp).replace(tzinfo = None)
+        lechmere_wait = (next_lechmere_time - now).seconds // 60
+        # print(f'lechmere_wait_69 {lechmere_wait}')
+        lechmere_69_msg.text = f'69 Lechmere: {lechmere_wait}m'
+    else:
+        lechmere_69_msg.text = f'69 Lechmere: tmrw'
+
+    if cycles_since_calibration >= 180: # every 30 mins
+        clock_calibrated = calibrate_realtime_clock()
+        if clock_calibrated:
+            print('clock calibrated !')
+            cycles_since_calibration = 0
+        else:
+            print('clock failed to calibrate :(')
+
     display.refresh()
     time.sleep(10)
+
+
+
