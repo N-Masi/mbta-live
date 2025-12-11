@@ -2,6 +2,8 @@
 
 Get live updates from MTBA bus routes displayed on an LED board!
 
+![](media/IMG_7362.JPG)
+
 ### Hardware
 
 Adafruit MatrixPortal and a HUB75 LED board

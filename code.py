@@ -29,12 +29,14 @@ COLOR_DARK_WHITE = 0x777777
 COLOR_BUS_83 = 0x7a5800
 COLOR_BUS_109 = 0x7a0022
 COLOR_BUS_69 = 0x144700
+COLOR_TIME = 0x1111a0
+LOGGING = True
 
 # helper functions
 def calibrate_realtime_clock() -> bool:
     the_rtc = rtc.RTC()
     response = requests.get(TIME_URL, headers=HEADERS)
-    print(response.headers)
+    log(response.headers)
     json = response.json()
     response.close()
     current_time = json["datetime"]
@@ -48,6 +50,22 @@ def calibrate_realtime_clock() -> bool:
     now = time.struct_time((year, month, mday, hours, minutes, seconds, week_day, year_day, is_dst))
     the_rtc.datetime = now
     return True
+
+def get_time_msg_text(now: datetime) -> str:
+    hour = now.hour // 12
+    if hour == 0:
+        hour = 12
+    hour = str(hour)
+    if len(hour) == 1:
+        hour = "0"+hour
+    minute = str(now.minute)
+    if len(minute) == 1:
+        minute = "0"+minute
+    return f'{hour}:{minute}'
+
+def log(*args):
+    if LOGGING:
+        print(*args)
 
 # setup LED board
 displayio.release_displays()
@@ -82,7 +100,7 @@ led_msg = adafruit_display_text.label.Label(
     y=8)
 G.append(led_msg)
 display.refresh()
-print(led_msg.text)
+log(led_msg.text)
 
 # connect to wifi
 ssid = getenv("CIRCUITPY_WIFI_SSID")
@@ -96,7 +114,7 @@ while not esp32.is_connected:
     try:
         esp32.connect_AP(ssid, password)
     except OSError as e:
-        print("could not connect to AP, retrying: ", e)
+        log("could not connect to AP, retrying: ", e)
         continue
 wifi_msg = adafruit_display_text.label.Label(
     FONT,
@@ -106,12 +124,12 @@ wifi_msg = adafruit_display_text.label.Label(
     y=16)
 G.append(wifi_msg)
 display.refresh()
-print(wifi_msg.text)
+log(wifi_msg.text)
 
 if esp32.status == adafruit_esp32spi.WL_IDLE_STATUS:
-    print("ESP32 found and in idle mode")
-print("Firmware vers.", esp32.firmware_version)
-print("MAC addr:", ":".join("%02X" % byte for byte in esp32.MAC_address))
+    log("ESP32 found and in idle mode")
+log("Firmware vers.", esp32.firmware_version)
+log("MAC addr:", ":".join("%02X" % byte for byte in esp32.MAC_address))
 
 # establish http connection
 pool = adafruit_connection_manager.get_radio_socketpool(esp32)
@@ -125,28 +143,28 @@ http_msg = adafruit_display_text.label.Label(
     y=24)
 G.append(http_msg)
 display.refresh()
-print(http_msg.text)
+log(http_msg.text)
 
 # calibrate onboard clock
 clock_calibrated = calibrate_realtime_clock()
 if clock_calibrated:
-    time_msg = adafruit_display_text.label.Label(
+    clock_msg = adafruit_display_text.label.Label(
         FONT,
         color=COLOR_DARK_WHITE,
         text='Realtime: on',
         x=1,
         y=32)
-    G.append(time_msg)
+    G.append(clock_msg)
     display.refresh()
-    print(time_msg.text)
+    log(clock_msg.text)
 else:
-    print('failed to calibrate clock')
+    log('failed to calibrate clock')
 
 time.sleep(5)
 G.remove(led_msg)
 G.remove(wifi_msg)
 G.remove(http_msg)
-G.remove(time_msg)
+G.remove(clock_msg)
 
 # reset screen
 central_83_msg = adafruit_display_text.label.Label(
@@ -154,42 +172,70 @@ central_83_msg = adafruit_display_text.label.Label(
     color=COLOR_BUS_83,
     text=f'83 Central: ---',
     x=1,
-    y=18)
+    y=27)
 porter_83_msg = adafruit_display_text.label.Label(
     FONT,
     color=COLOR_BUS_83,
     text=f'83 Porter: ---',
     x=1,
-    y=26)
+    y=35)
 harvard_109_msg = adafruit_display_text.label.Label(
     FONT,
     color=COLOR_BUS_109,
     text=f'109 Harvard: ---',
     x=1,
-    y=34)
+    y=43)
 harvard_69_msg = adafruit_display_text.label.Label(
     FONT,
     color=COLOR_BUS_69,
     text=f'69 Harvard: ---',
     x=1,
-    y=42)
+    y=51)
 lechmere_69_msg = adafruit_display_text.label.Label(
     FONT,
     color=COLOR_BUS_69,
     text=f'69 Lechmere: ---',
     x=1,
-    y=50)
+    y=59)
 G.append(central_83_msg)
 G.append(porter_83_msg)
 G.append(harvard_109_msg)
 G.append(harvard_69_msg)
 G.append(lechmere_69_msg)
+
+# time message
+time_msg = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_DARK_WHITE,
+    text=f'--:--',
+    x=22,
+    y=17
+    )
+G.append(time_msg)
+
+# other messages
+happy_msg = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_BUS_69,
+    text='HAPPY',
+    x=3,
+    y=6)
+holidays_msg = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_BUS_109,
+    text='HOLIDAYS!',
+    x=27,
+    y=6)
+G.append(happy_msg)
+G.append(holidays_msg)
+
 display.refresh()
 
 cycles_since_calibration = 0
 while True:
     cycles_since_calibration += 1
     now = datetime.now()
+    time_msg.text = get_time_msg_text(now)
 
     response = requests.get(CENTRAL_83_URL)
     central_83 = response.json()
@@ -216,7 +262,7 @@ while True:
         next_central_time = datetime.fromisoformat(next_central_timestamp).replace(tzinfo = None) # this hack only works because the local time is in the same timezone as the train stations
         central_wait = (next_central_time - now).seconds // 60
         central_83_msg.text = f'83 Central: {central_wait}m'
-        print(f'central wait {central_wait}')
+        log(f'central wait {central_wait}')
     else:
         central_83_msg.text = f'83 Central: tmrw'
 
@@ -224,7 +270,7 @@ while True:
         next_porter_timestamp = porter_83['data'][0]['attributes']['arrival_time']
         next_porter_time = datetime.fromisoformat(next_porter_timestamp).replace(tzinfo = None)
         porter_wait = (next_porter_time - now).seconds // 60
-        print(f'porter_wait {porter_wait}')
+        log(f'porter_wait {porter_wait}')
         porter_83_msg.text = f'83 Porter: {porter_wait}m'
     else:
         porter_83_msg.text = f'83 Porter: tmrw'
@@ -233,7 +279,7 @@ while True:
         next_harvard_timestamp = harvard_109['data'][0]['attributes']['arrival_time']
         next_harvard_time = datetime.fromisoformat(next_harvard_timestamp).replace(tzinfo = None)
         harvard_wait = (next_harvard_time - now).seconds // 60
-        print(f'harvard_wait {harvard_wait}')
+        log(f'harvard_wait {harvard_wait}')
         harvard_109_msg.text = f'109 Harvard: {harvard_wait}m'
     else:
         harvard_109_msg.text = f'109 Harvard: tmrw'
@@ -242,7 +288,7 @@ while True:
         next_harvard_timestamp = harvard_69['data'][0]['attributes']['arrival_time']
         next_harvard_time = datetime.fromisoformat(next_harvard_timestamp).replace(tzinfo = None)
         harvard_wait = (next_harvard_time - now).seconds // 60
-        print(f'harvard_wait_69 {harvard_wait}')
+        log(f'harvard_wait_69 {harvard_wait}')
         harvard_69_msg.text = f'69 Harvard: {harvard_wait}m'
     else:
         harvard_69_msg.text = f'69 Harvard: tmrw'
@@ -251,7 +297,7 @@ while True:
         next_lechmere_timestamp = lechmere_69['data'][0]['attributes']['arrival_time']
         next_lechmere_time = datetime.fromisoformat(next_lechmere_timestamp).replace(tzinfo = None)
         lechmere_wait = (next_lechmere_time - now).seconds // 60
-        # print(f'lechmere_wait_69 {lechmere_wait}')
+        # log(f'lechmere_wait_69 {lechmere_wait}')
         lechmere_69_msg.text = f'69 Lechmere: {lechmere_wait}m'
     else:
         lechmere_69_msg.text = f'69 Lechmere: tmrw'
@@ -259,10 +305,10 @@ while True:
     if cycles_since_calibration >= 180: # every 30 mins
         clock_calibrated = calibrate_realtime_clock()
         if clock_calibrated:
-            print('clock calibrated !')
+            log('clock calibrated !')
             cycles_since_calibration = 0
         else:
-            print('clock failed to calibrate :(')
+            log('clock failed to calibrate :(')
 
     display.refresh()
     time.sleep(10)
