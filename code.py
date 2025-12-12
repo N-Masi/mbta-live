@@ -52,7 +52,7 @@ def calibrate_realtime_clock() -> bool:
     return True
 
 def get_time_msg_text(now: datetime) -> str:
-    hour = now.hour // 12
+    hour = now.hour % 12
     if hour == 0:
         hour = 12
     hour = str(hour)
