@@ -44,9 +44,15 @@ Get live updates from MTBA bus routes displayed on an LED board!
 
 4. Copy over the `fonts/` direcectory to the CIRCUITPY drive
 
-5. Replace the contents of the CIRCUITPY's `code.py` with the `code.py` from this repository
+5. Replace the contents of the CIRCUITPY's `circuitpy-lib/` directory with the one in this repo
 
-6. The code will now run whenever the board is connected to sufficient USB-C power :) 
+6. Replace the contents of the CIRCUITPY's `code.py` with the `code.py` from this repo
+
+    a. If you are not using a 64x64 LED board with a fifth `E` pin, you will need to modify the definition of the `matrix` object
+
+    b. You can find the stop IDs of bus/T stops you prefer by clicking on the stop's icon in Google Maps on web (not mobile)
+
+7. The code will now run whenever the board is connected to sufficient USB-C power :) 
 
 Alternative instructions for steps [1](https://learn.adafruit.com/upgrading-esp32-firmware/upgrade-all-in-one-esp32-airlift-firmware) and [2](https://learn.adafruit.com/adafruit-pyportal/install-circuitpython) from Adafruit.
 
