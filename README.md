@@ -6,7 +6,7 @@ Get live updates from MTBA bus routes displayed on an LED board!
 
 ### Hardware
 
-Adafruit MatrixPortal and a HUB75 LED board
+[Adafruit MatrixPortal](https://www.adafruit.com/product/4745) and a [HUB75 LED board](https://www.adafruit.com/product/4732).
 
 ### Setup
 
@@ -60,8 +60,4 @@ Thanks to Adafruit for hardware.
 
 Connect to board terminal: `minicom -b 115200 -o -D /dev/tty.<insert_usb_port>`
 
-API issue:
-* https://github.com/adafruit/Adafruit_CircuitPython_Requests/issues/127
-    - suggests updating ESP32: https://learn.adafruit.com/upgrading-esp32-firmware/upgrade-all-in-one-esp32-airlift-firmware
-* https://stackoverflow.com/questions/79095374/brokenpipeerror-when-fetching-from-api-for-matrix-portal-m4
-    - ESP32 update didn't work
+TODO: issue where board shuts off after being on for awhile (logic error? OOM?)

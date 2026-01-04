@@ -26,11 +26,12 @@ LECHMERE_69_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API
 HEADERS = {"user-agent": "mbta-tracker"}
 WIFI_DEBUG = False
 COLOR_DARK_WHITE = 0x777777
+COLOR_DARK_ORANGE = 0xC76E00
 COLOR_BUS_83 = 0x7a5800
 COLOR_BUS_109 = 0x7a0022
 COLOR_BUS_69 = 0x144700
 COLOR_TIME = 0x1111a0
-LOGGING = True
+LOGGING = False
 
 # helper functions
 def calibrate_realtime_clock() -> bool:
@@ -214,20 +215,13 @@ time_msg = adafruit_display_text.label.Label(
 G.append(time_msg)
 
 # other messages
-happy_msg = adafruit_display_text.label.Label(
+new_year_msg = adafruit_display_text.label.Label(
     FONT,
-    color=COLOR_BUS_69,
-    text='HAPPY',
-    x=3,
+    color=COLOR_DARK_ORANGE,
+    text='HELLO 2026',
+    x=12,
     y=6)
-holidays_msg = adafruit_display_text.label.Label(
-    FONT,
-    color=COLOR_BUS_109,
-    text='HOLIDAYS!',
-    x=27,
-    y=6)
-G.append(happy_msg)
-G.append(holidays_msg)
+G.append(new_year_msg)
 
 display.refresh()
 
