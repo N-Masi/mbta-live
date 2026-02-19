@@ -25,6 +25,8 @@ HARVARD_109_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API
 HARVARD_69_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=69&filter[stop]=1427"
 LECHMERE_69_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=69&filter[stop]=1403"
 HEADERS = {"user-agent": "mbta-tracker"}
+CYCLES_BETWEEN_REALTIME_CALIBRATION = 180 # every 30-45 mins, based on SLEEP_TIME=10 and 5 stops
+SLEEP_TIME = 10 # unit: seconds | may get blocked if constantly pulling MBTA API
 WIFI_DEBUG = False
 COLOR_DARK_WHITE = 0x777777
 COLOR_DARK_ORANGE = 0xC76E00
@@ -225,8 +227,8 @@ G.append(time_msg)
 new_year_msg = adafruit_display_text.label.Label(
     FONT,
     color=COLOR_DARK_ORANGE,
-    text='HELLO 2026',
-    x=12,
+    text='DO A JIG',
+    x=16,
     y=6)
 G.append(new_year_msg)
 
@@ -261,49 +263,64 @@ while True:
     if len(central_83['data']) > 0:
         next_central_timestamp = central_83['data'][0]['attributes']['arrival_time']
         next_central_time = datetime.fromisoformat(next_central_timestamp).replace(tzinfo = None) # this hack only works because the local time is in the same timezone as the train stations
-        central_wait = (next_central_time - now).seconds // 60
-        central_83_msg.text = f'83 Central: {central_wait}m'
+        if now > next_central_time:
+            central_wait = 'ARR'
+        else:
+            central_wait = str((next_central_time - now).seconds // 60) + 'm'
         log(f'central wait {central_wait}')
+        central_83_msg.text = f'83 Central: {central_wait}'
     else:
         central_83_msg.text = f'83 Central: tmrw'
 
     if len(porter_83['data']) > 0:
         next_porter_timestamp = porter_83['data'][0]['attributes']['arrival_time']
         next_porter_time = datetime.fromisoformat(next_porter_timestamp).replace(tzinfo = None)
-        porter_wait = (next_porter_time - now).seconds // 60
+        if now > next_porter_time:
+            porter_wait = 'ARR'
+        else:
+            porter_wait = str((next_porter_time - now).seconds // 60) + 'm'
         log(f'porter_wait {porter_wait}')
-        porter_83_msg.text = f'83 Porter: {porter_wait}m'
+        porter_83_msg.text = f'83 Porter: {porter_wait}'
     else:
         porter_83_msg.text = f'83 Porter: tmrw'
 
     if len(harvard_109['data']) > 0:
         next_harvard_timestamp = harvard_109['data'][0]['attributes']['arrival_time']
         next_harvard_time = datetime.fromisoformat(next_harvard_timestamp).replace(tzinfo = None)
-        harvard_wait = (next_harvard_time - now).seconds // 60
+        if now > next_harvard_time:
+            harvard_wait = 'ARR'
+        else:
+            harvard_wait = str((next_harvard_time - now).seconds // 60) + 'm'
         log(f'harvard_wait {harvard_wait}')
-        harvard_109_msg.text = f'109 Harvard: {harvard_wait}m'
+        harvard_109_msg.text = f'109 Harvard: {harvard_wait}'
     else:
         harvard_109_msg.text = f'109 Harvard: tmrw'
 
     if len(harvard_69['data']) > 0:
         next_harvard_timestamp = harvard_69['data'][0]['attributes']['arrival_time']
         next_harvard_time = datetime.fromisoformat(next_harvard_timestamp).replace(tzinfo = None)
-        harvard_wait = (next_harvard_time - now).seconds // 60
+        if now > next_harvard_time:
+            harvard_wait = 'ARR'
+        else:
+            harvard_wait = str((next_harvard_time - now).seconds // 60) + 'm'
         log(f'harvard_wait_69 {harvard_wait}')
-        harvard_69_msg.text = f'69 Harvard: {harvard_wait}m'
+        harvard_69_msg.text = f'69 Harvard: {harvard_wait}'
     else:
         harvard_69_msg.text = f'69 Harvard: tmrw'
 
     if len(lechmere_69['data']) > 0:
         next_lechmere_timestamp = lechmere_69['data'][0]['attributes']['arrival_time']
         next_lechmere_time = datetime.fromisoformat(next_lechmere_timestamp).replace(tzinfo = None)
-        lechmere_wait = (next_lechmere_time - now).seconds // 60
+        if now > next_harvard_time:
+            lechmere_wait = 'ARR'
+        else:
+            lechmere_wait = str((next_lechmere_time - now).seconds // 60) + 'm'
         log(f'lechmere_wait_69 {lechmere_wait}')
-        lechmere_69_msg.text = f'69 Lechmere: {lechmere_wait}m'
+        lechmere_69_msg.text = f'69 Lechmere: {lechmere_wait}'
     else:
         lechmere_69_msg.text = f'69 Lechmere: tmrw'
 
-    if cycles_since_calibration >= 180: # every 30 mins
+    if cycles_since_calibration >= CYCLES_BETWEEN_REALTIME_CALIBRATION: # every 30-45 mins
         clock_calibrated = calibrate_realtime_clock()
         if clock_calibrated:
             log('clock calibrated !')
@@ -312,7 +329,7 @@ while True:
             log('clock failed to calibrate :(')
 
     display.refresh()
-    time.sleep(10)
+    time.sleep(SLEEP_TIME)
 
 
 
