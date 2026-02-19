@@ -16,7 +16,8 @@ import adafruit_display_text.label
 
 # constants
 G = displayio.Group() # TODO: a global, not a constant
-TIME_URL = "https://worldtimeapi.org/api/ip"
+TIME_URL = "https://gettimeapi.dev/v1/time?timezone=EST"
+TIME_URL_BACKUP = "https://gettimeapi.dev/v1/time?timezone=EDT"
 FONT = bitmap_font.load_font("fonts/4x6_kujala.pcf")
 CENTRAL_83_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2437"
 PORTER_83_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2453"
@@ -36,18 +37,24 @@ LOGGING = False
 # helper functions
 def calibrate_realtime_clock() -> bool:
     the_rtc = rtc.RTC()
-    response = requests.get(TIME_URL, headers=HEADERS)
+    is_dst = 0
+    try:
+        response = requests.get(TIME_URL, headers=HEADERS)
+    except:
+        response = requests.get(TIME_URL_BACKUP, headers=HEADERS)
+        is_dst = 1
+    log(response)
     log(response.headers)
     json = response.json()
+    log(json)
     response.close()
-    current_time = json["datetime"]
+    current_time = json["iso8601"]
     the_date, the_time = current_time.split("T")
     year, month, mday = (int(x) for x in the_date.split("-"))
-    the_time = the_time.split(".")[0]
+    the_time = the_time.split("-")[0]
     hours, minutes, seconds = (int(x) for x in the_time.split(":"))
-    year_day = json["day_of_year"]
-    week_day = json["day_of_week"]
-    is_dst = json["dst"]
+    year_day = -1
+    week_day = -1
     now = time.struct_time((year, month, mday, hours, minutes, seconds, week_day, year_day, is_dst))
     the_rtc.datetime = now
     return True
@@ -291,7 +298,7 @@ while True:
         next_lechmere_timestamp = lechmere_69['data'][0]['attributes']['arrival_time']
         next_lechmere_time = datetime.fromisoformat(next_lechmere_timestamp).replace(tzinfo = None)
         lechmere_wait = (next_lechmere_time - now).seconds // 60
-        # log(f'lechmere_wait_69 {lechmere_wait}')
+        log(f'lechmere_wait_69 {lechmere_wait}')
         lechmere_69_msg.text = f'69 Lechmere: {lechmere_wait}m'
     else:
         lechmere_69_msg.text = f'69 Lechmere: tmrw'
