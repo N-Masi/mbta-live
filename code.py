@@ -17,7 +17,7 @@ import adafruit_display_text.label
 # constants
 G = displayio.Group() # TODO: a global, not a constant
 TIME_URL = "https://gettimeapi.dev/v1/time?timezone=EST"
-TIME_URL_BACKUP = "https://gettimeapi.dev/v1/time?timezone=EDT"
+IS_DST = 1
 FONT = bitmap_font.load_font("fonts/4x6_kujala.pcf")
 CENTRAL_83_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2437"
 PORTER_83_URL = f"http://api-v3.mbta.com/predictions?api_key={getenv("MBTA_API_KEY")}&page[limit]=1&filter[route]=83&filter[stop]=2453"
@@ -34,17 +34,13 @@ COLOR_BUS_83 = 0x7a5800
 COLOR_BUS_109 = 0x7a0022
 COLOR_BUS_69 = 0x144700
 COLOR_TIME = 0x1111a0
-LOGGING = False
+LOGGING = True
 
 # helper functions
 def calibrate_realtime_clock() -> bool:
     the_rtc = rtc.RTC()
-    is_dst = 0
-    try:
-        response = requests.get(TIME_URL, headers=HEADERS)
-    except:
-        response = requests.get(TIME_URL_BACKUP, headers=HEADERS)
-        is_dst = 1
+    is_dst = IS_DST
+    response = requests.get(TIME_URL, headers=HEADERS)
     log(response)
     log(response.headers)
     json = response.json()
@@ -55,6 +51,8 @@ def calibrate_realtime_clock() -> bool:
     year, month, mday = (int(x) for x in the_date.split("-"))
     the_time = the_time.split("-")[0]
     hours, minutes, seconds = (int(x) for x in the_time.split(":"))
+    if is_dst:
+        hours += 1
     year_day = -1
     week_day = -1
     now = time.struct_time((year, month, mday, hours, minutes, seconds, week_day, year_day, is_dst))
@@ -218,19 +216,54 @@ time_msg = adafruit_display_text.label.Label(
     FONT,
     color=COLOR_DARK_WHITE,
     text=f'--:--',
-    x=22,
+    x=35,
     y=17
     )
 G.append(time_msg)
 
 # other messages
-new_year_msg = adafruit_display_text.label.Label(
+msg_1 = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_DARK_WHITE,
+    text='l ghthouse',
+    x=1,
+    y=4)
+G.append(msg_1)
+msg_1_cap = adafruit_display_text.label.Label(
     FONT,
     color=COLOR_DARK_ORANGE,
-    text='DO A JIG',
-    x=16,
-    y=6)
-G.append(new_year_msg)
+    text='I',
+    x=5,
+    y=4)
+G.append(msg_1_cap)
+msg_2 = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_DARK_WHITE,
+    text='ally',
+    x=9,
+    y=10)
+G.append(msg_2)
+msg_2_cap = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_DARK_ORANGE,
+    text='R',
+    x=5,
+    y=10)
+G.append(msg_2_cap)
+msg_3 = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_DARK_WHITE,
+    text='quad',
+    x=9,
+    y=16)
+G.append(msg_3)
+msg_3_cap = adafruit_display_text.label.Label(
+    FONT,
+    color=COLOR_DARK_ORANGE,
+    text='S',
+    x=5,
+    y=16)
+G.append(msg_3_cap)
 
 display.refresh()
 
